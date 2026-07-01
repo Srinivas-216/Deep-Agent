@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Assistance</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:#f4f6f9;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{background:#1a1a2e;color:white;padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:10}
+header h1{font-size:16px;font-weight:600}
+#status{font-size:12px;padding:4px 12px;border-radius:20px;background:rgba(255,255,255,0.08);color:#888;transition:all 0.3s;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#status.uploaded{background:rgba(72,199,142,0.15);color:#48c78e}
+#status.uploaded.auto{background:rgba(99,102,241,0.15);color:#a5b4fc}
+#wsIndicator{font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,0.06);color:#666;transition:all 0.3s}
+#wsIndicator.connected{background:rgba(72,199,142,0.12);color:#48c78e}
+#wsIndicator.connecting{color:#f59e0b}
+
+/* ── Layout ── */
+.layout{display:flex;flex:1;overflow:hidden;position:relative}
+
+/* ── Sidebar ── */
+.sidebar{width:260px;background:#121220;display:flex;flex-direction:column;flex-shrink:0;border-right:1px solid rgba(255,255,255,0.06);overflow:hidden;transition:width 0.3s cubic-bezier(.4,0,.2,1);position:relative}
+.sidebar.collapsed{width:0;border-right:none}
+#sidebarToggle:hover{background:rgba(255,255,255,0.15) !important}
+.sidebar-inner{width:260px;display:flex;flex-direction:column;flex:1;overflow:hidden}
+.sidebar-section{padding:14px 14px 8px;font-size:10px;font-weight:700;letter-spacing:1px;color:#555;text-transform:uppercase}
+#newChatBtn{margin:0 12px 10px;background:rgba(255,255,255,0.05);border:1px dashed rgba(255,255,255,0.12);color:#aaa;border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px}
+#newChatBtn:hover{background:rgba(255,255,255,0.1);color:white}
+.sidebar-pdfs{flex:1;overflow-y:auto;padding:0 8px}
+.sidebar-pdfs::-webkit-scrollbar{width:4px}
+.sidebar-pdfs::-webkit-scrollbar-thumb{background:#333;border-radius:4px}
+.pdf-entry{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:#bbb;font-size:13px;transition:background 0.15s}
+.pdf-entry:hover{background:rgba(255,255,255,0.06);color:white}
+.pdf-entry.active{background:rgba(99,102,241,0.2);color:white}
+.pdf-entry .pdf-icon-sm{font-size:16px;flex-shrink:0}
+.pdf-entry .pdf-info{flex:1;overflow:hidden}
+.pdf-entry .pdf-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+.pdf-entry .pdf-meta{font-size:10.5px;color:#555;margin-top:1px}
+.pdf-entry.active .pdf-meta{color:#888}
+.pdf-delete-btn{opacity:0;flex-shrink:0;width:22px;height:22px;border-radius:5px;background:transparent;border:none;color:#666;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.pdf-entry:hover .pdf-delete-btn{opacity:1}
+.pdf-delete-btn:hover{background:rgba(239,68,68,0.15);color:#f87171}
+.sidebar-upload{padding:12px;border-top:1px solid rgba(255,255,255,0.06)}
+#sideFileLabel{display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,0.04);border:1px dashed rgba(255,255,255,0.15);border-radius:8px;cursor:pointer;font-size:12.5px;color:#888;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:all 0.2s}
+#sideFileLabel:hover{background:rgba(255,255,255,0.08);color:#ccc}
+#pdfFile{display:none}
+#uploadBtn{width:100%;background:#6366f1;color:white;border:none;padding:9px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:opacity 0.2s,background 0.2s}
+#uploadBtn:hover:not(:disabled){background:#5254cc}
+#uploadBtn:disabled{opacity:0.5;cursor:not-allowed}
+
+/* ── Main chat area ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#f4f6f9;min-width:0}
+#chat{flex:1;overflow-y:auto;padding:24px 32px;display:flex;flex-direction:column;gap:14px}
+#chat::-webkit-scrollbar{width:5px}
+#chat::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px}
+.empty-state{margin:auto;text-align:center;color:#aaa}
+.empty-state h2{font-size:18px;color:#555;margin-bottom:6px}
+.empty-state p{font-size:13px}
+
+/* ── PDF Viewer Panel ── */
+.pdf-panel{width:0;background:#1a1a2e;display:flex;flex-direction:column;flex-shrink:0;border-left:1px solid rgba(255,255,255,0.08);overflow:hidden;transition:width 0.35s cubic-bezier(.4,0,.2,1)}
+.pdf-panel.open{width:580px}
+.pdf-panel.fullscreen{position:fixed;inset:0;width:100vw !important;height:100vh;z-index:1000;border:none}
+.pdf-panel-header{background:#121220;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0}
+.pdf-panel-title{font-size:12px;font-weight:600;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;margin-right:8px}
+.pdf-panel-controls{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.pdf-page-badge{font-size:11px;color:#6366f1;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);padding:2px 9px;border-radius:20px;white-space:nowrap}
+.pdf-nav-btn{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#aaa;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.pdf-nav-btn:hover{background:rgba(255,255,255,0.12);color:white}
+.pdf-close-btn{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#888;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.pdf-close-btn:hover{background:rgba(220,50,50,0.15);border-color:rgba(220,50,50,0.3);color:#f87171}
+
+.pdf-canvas-wrap{flex:1;overflow-y:auto;overflow-x:hidden;background:#2a2a3e;display:flex;flex-direction:column;align-items:center;padding:16px 12px;gap:12px}
+.pdf-canvas-wrap::-webkit-scrollbar{width:5px}
+.pdf-canvas-wrap::-webkit-scrollbar-thumb{background:#444;border-radius:4px}
+
+/* ── Canvas container — position:relative so text layer overlays canvas ── */
+#pdfCanvasContainer{position:relative;display:inline-block}
+#pdfCanvas{max-width:100%;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.5);display:block;position:relative;z-index:1}
+
+/* ── PDF Text layer — invisible spans over the canvas for highlighting ── */
+.pdf-text-layer{
+  position:absolute;top:0;left:0;
+  z-index:2;
+  pointer-events:none;
+  line-height:1;overflow:hidden;
+}
+.pdf-text-layer span{
+  color:transparent;
+  position:absolute;
+  white-space:pre;
+  cursor:text;
+  transform-origin:0% 0%;
+}
+/* ── Yellow highlight on citation snippet ── */
+.pdf-text-layer span.pdf-highlight{
+  background:rgba(255,220,0,0.5);
+  border-radius:3px;
+  box-shadow:0 0 0 2px rgba(255,200,0,0.55);
+  transition:background 0.3s,box-shadow 0.3s;
+}
+.pdf-text-layer span.pdf-highlight-fade{
+  background:rgba(255,220,0,0) !important;
+  box-shadow:none !important;
+  transition:background 0.8s,box-shadow 0.8s;
+}
+/* ── Blue highlight on search ALL matches ── */
+.pdf-text-layer span.pdf-search-highlight{
+  background:rgba(99,102,241,0.35);
+  border-radius:3px;
+  box-shadow:0 0 0 1px rgba(99,102,241,0.5);
+}
+
+.pdf-loading{color:#666;font-size:13px;margin:auto;text-align:center;padding:40px 20px}
+.pdf-loading .spinner{width:28px;height:28px;border:2px solid #333;border-top-color:#6366f1;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Page highlight bar (flashes on citation jump) ── */
+#pageHighlight{position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:0 0 4px 4px;opacity:0;transition:opacity 0.15s;pointer-events:none}
+#pageHighlight.flash{opacity:1}
+
+/* ── Message bubbles ── */
+.msg-wrapper{display:flex;flex-direction:column;max-width:72%}
+.msg-wrapper.user-wrapper{align-self:flex-end;align-items:flex-end}
+.message{padding:12px 16px;border-radius:14px;line-height:1.65;font-size:14px;word-break:break-word;white-space:pre-wrap}
+.user{background:#1a1a2e;color:white;border-bottom-right-radius:4px}
+.bot{background:white;border:1px solid #e5e7eb;border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.bot.error{border-color:#fca5a5;background:#fff5f5;color:#b91c1c}
+.bot pre{background:#f4f6f9;border:1px solid #e5e7eb;border-radius:6px;padding:10px;margin:8px 0;overflow-x:auto;font-family:'Consolas','Courier New',Courier,monospace;font-size:13px}
+.bot code{background:#f3f4f6;color:#e11d48;padding:2px 6px;border-radius:4px;font-family:'Consolas','Courier New',Courier,monospace;font-size:13px}
+.bot pre code{background:transparent;color:inherit;padding:0;border-radius:0}
+.bot ul{margin-left:22px;margin-top:6px;margin-bottom:6px;list-style-type:disc}
+.bot li{margin-bottom:4px}
+
+/* ── Markdown table (used for document comparisons etc.) ── */
+.bot .table-wrap{margin:10px 0;overflow-x:auto;border-radius:10px;border:1px solid #e5e7eb;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.bot table.md-table{border-collapse:collapse;width:100%;font-size:13px;background:white}
+.bot table.md-table thead th{
+  background:linear-gradient(135deg,#eef2ff 0%,#f0f4ff 100%);
+  color:#3730a3;font-weight:700;text-align:left;
+  padding:10px 14px;border-bottom:2px solid #c7d2fe;
+  white-space:nowrap;
+}
+.bot table.md-table tbody td{
+  padding:9px 14px;border-bottom:1px solid #f1f2f6;
+  color:#374151;vertical-align:top;line-height:1.5;
+}
+.bot table.md-table tbody tr:last-child td{border-bottom:none}
+.bot table.md-table tbody tr:hover{background:#f8f9fc}
+.bot table.md-table tbody tr:nth-child(even){background:#fafbfd}
+.bot table.md-table tbody tr:nth-child(even):hover{background:#f3f4f9}
+
+/* ── Citations ── */
+.citations{margin-top:10px;display:flex;flex-wrap:wrap;gap:7px}
+.citation-badge{display:inline-flex;align-items:center;gap:7px;padding:5px 12px 5px 5px;border-radius:30px;background:linear-gradient(135deg,#eef2ff 0%,#f0f4ff 100%);border:1px solid #c7d2fe;cursor:pointer;transition:all 0.22s cubic-bezier(.4,0,.2,1);box-shadow:0 1px 4px rgba(99,102,241,0.08);position:relative;overflow:hidden;max-width:240px}
+.citation-badge::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,#6366f1,#8b5cf6);opacity:0;transition:opacity 0.22s}
+.citation-badge:hover{border-color:#6366f1;box-shadow:0 4px 14px rgba(99,102,241,0.28);transform:translateY(-1px)}
+.citation-badge:hover::before{opacity:1}
+.citation-badge:hover .cit-num,.citation-badge:hover .cit-label,.citation-badge:hover .cit-page{color:white!important;background:rgba(255,255,255,0.2)!important;border-color:rgba(255,255,255,0.3)!important}
+.citation-badge:active{transform:translateY(0)}
+.cit-num{position:relative;z-index:1;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(99,102,241,0.4);transition:all 0.22s}
+.cit-label{position:relative;z-index:1;font-size:11.5px;font-weight:600;color:#3730a3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;transition:color 0.22s}
+.cit-page{position:relative;z-index:1;font-size:10.5px;font-weight:600;color:#6366f1;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);padding:1px 7px;border-radius:20px;white-space:nowrap;flex-shrink:0;transition:all 0.22s}
+.inline-citation{display:inline-flex;align-items:center;background:linear-gradient(135deg,#eef2ff,#f0f4ff);color:#4f46e5;border:1px solid #c7d2fe;padding:1px 7px;border-radius:5px;font-size:11.5px;font-weight:700;cursor:pointer;margin:0 2px;transition:all 0.15s;box-shadow:0 1px 3px rgba(99,102,241,0.12)}
+.inline-citation:hover{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border-color:#6366f1;box-shadow:0 2px 8px rgba(99,102,241,0.35)}
+
+/* ── Smart suggestion card ── */
+.suggestion-card{background:white;border:1px solid #e5e7eb;border-radius:14px;border-bottom-left-radius:4px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.suggestion-card .sugg-header{font-size:12px;color:#9ca3af;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.suggestion-card .sugg-header span{font-size:15px}
+.suggestion-pills{display:flex;flex-direction:column;gap:7px}
+.sugg-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:20px;background:#f4f6f9;border:1px solid #e5e7eb;cursor:pointer;font-size:13px;color:#374151;transition:all 0.18s;text-align:left}
+.sugg-pill:hover{background:#eef2ff;border-color:#c7d2fe;color:#4338ca}
+.sugg-pill .sugg-icon{font-size:14px;flex-shrink:0}
+
+/* ── Typing dots ── */
+.typing{display:flex;gap:5px;align-items:center;padding:14px 18px}
+.typing span{width:7px;height:7px;border-radius:50%;background:#bbb;animation:bounce 1.2s infinite ease-in-out}
+.typing span:nth-child(2){animation-delay:0.2s}
+.typing span:nth-child(3){animation-delay:0.4s}
+@keyframes bounce{0%,80%,100%{transform:scale(0.7);opacity:0.4}40%{transform:scale(1);opacity:1}}
+
+.system-msg{text-align:center;font-size:11.5px;color:#999;background:#e8eaf0;border-radius:20px;padding:4px 14px;margin:0 auto}
+.input-bar{background:white;border-top:1px solid #e5e7eb;padding:14px 24px;display:flex;gap:10px;align-items:center}
+#question{flex:1;padding:11px 16px;border:1px solid #d1d5db;border-radius:10px;font-size:14px;outline:none;background:#f9fafb;font-family:inherit;transition:border-color 0.2s}
+#question:focus{border-color:#6366f1;background:white}
+#sendBtn{background:#1a1a2e;color:white;border:none;padding:11px 22px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:500;white-space:nowrap;transition:opacity 0.2s}
+#sendBtn:hover:not(:disabled){opacity:0.85}
+#sendBtn:disabled{opacity:0.45;cursor:not-allowed}
+
+/* ── Floating PDF switcher ── */
+#pdfSwitcherBtn{position:absolute;bottom:80px;left:16px;z-index:200;width:44px;height:44px;border-radius:50%;background:#1a1a2e;border:2px solid rgba(99,102,241,0.4);color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.18);transition:all 0.2s}
+#pdfSwitcherBtn:hover{background:#6366f1;border-color:#6366f1;transform:scale(1.08)}
+#pdfSwitcherBtn::after{content:'Switch PDF';position:absolute;left:52px;background:#1a1a2e;color:white;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 0.15s}
+#pdfSwitcherBtn:hover::after{opacity:1}
+#pdfSwitcherPopup{position:absolute;bottom:132px;left:16px;z-index:300;width:280px;background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.35);overflow:hidden;display:none;flex-direction:column}
+#pdfSwitcherPopup.open{display:flex}
+.switcher-header{padding:12px 14px 8px;font-size:10px;font-weight:700;letter-spacing:1px;color:#555;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,0.06)}
+.switcher-list{max-height:280px;overflow-y:auto;padding:6px 8px}
+.switcher-list::-webkit-scrollbar{width:4px}
+.switcher-list::-webkit-scrollbar-thumb{background:#333;border-radius:4px}
+.switcher-entry{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:#bbb;font-size:13px;transition:background 0.15s}
+.switcher-entry:hover{background:rgba(255,255,255,0.07);color:white}
+.switcher-entry.active{background:rgba(99,102,241,0.2);color:white}
+.switcher-entry .sw-icon{font-size:16px;flex-shrink:0}
+.switcher-entry .sw-info{flex:1;overflow:hidden}
+.switcher-entry .sw-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+.switcher-entry .sw-meta{font-size:10.5px;color:#555;margin-top:1px}
+.switcher-entry.active .sw-meta{color:#888}
+
+@media(max-width:768px){
+  .pdf-panel.open{width:100%;position:fixed;inset:52px 0 0 0;z-index:200}
+  .msg-wrapper{max-width:90%}
+  #chat{padding:16px}
+  #pdfSwitcherPopup{left:8px;width:calc(100vw - 16px)}
+}
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:center;gap:12px">
+    <!-- Toggle button in header — always visible, open or closed -->
+    <button id="sidebarToggle" onclick="toggleSidebar()" title="Toggle sidebar" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:white;width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:background 0.2s;flex-shrink:0">☰</button>
+    <h1>Assistance</h1>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div id="wsIndicator" class="connecting">⬤ connecting</div>
+    <div id="status">No PDF uploaded</div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-inner">
+      <div class="sidebar-section">Sessions</div>
+      <button id="newChatBtn" onclick="newChat()">＋ New Chat</button>
+      <div class="sidebar-section">Uploaded PDFs</div>
+      <div class="sidebar-pdfs" id="pdfList"></div>
+      <div class="sidebar-upload">
+        <label id="sideFileLabel" for="pdfFile">📎 Choose PDF</label>
+        <input type="file" id="pdfFile" accept=".pdf">
+        <button id="uploadBtn" onclick="uploadPDF()">Upload PDF</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Chat ── -->
+  <div class="main" style="position:relative">
+    <div id="chat">
+      <div class="empty-state" id="emptyState">
+        <h2>Ask your documents anything</h2>
+        <p>Upload a PDF from the sidebar to get started.</p>
+      </div>
+    </div>
+    <div class="input-bar">
+      <input type="text" id="question" placeholder="Ask a question about your PDF...">
+      <button id="sendBtn" onclick="sendQuestion()" disabled>Send</button>
+    </div>
+    <button id="pdfSwitcherBtn" onclick="togglePdfSwitcher(event)" title="Switch PDF">📄</button>
+    <button id="compareBtn" onclick="openCompare()" title="Compare PDFs"
+      style="position:absolute;bottom:80px;left:68px;z-index:200;width:44px;height:44px;border-radius:50%;background:#1a1a2e;border:2px solid rgba(99,102,241,0.4);color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.18);transition:all 0.2s">⚖️</button>
+    <div id="pdfSwitcherPopup">
+      <div class="switcher-header">Uploaded PDFs</div>
+      <div class="switcher-list" id="switcherList"></div>
+    </div>
+  </div>
+
+  <!-- ── PDF Viewer Panel ── -->
+  <div class="pdf-panel" id="pdfPanel">
+    <div class="pdf-panel-header">
+      <div class="pdf-panel-title" id="pdfPanelTitle">No document open</div>
+      <div class="pdf-panel-controls">
+        <span class="pdf-page-badge" id="pdfPageBadge">p.1</span>
+        <button class="pdf-nav-btn" onclick="pdfGoTo(currentPage - 1)" title="Previous page">‹</button>
+        <button class="pdf-nav-btn" onclick="pdfGoTo(currentPage + 1)" title="Next page">›</button>
+        <button class="pdf-nav-btn" onclick="pdfZoom(-0.25)" title="Zoom out">−</button>
+        <span id="zoomLabel" style="font-size:10.5px;color:#666;min-width:32px;text-align:center">100%</span>
+        <button class="pdf-nav-btn" onclick="pdfZoom(+0.25)" title="Zoom in">+</button>
+        <button class="pdf-nav-btn" id="fullscreenBtn" onclick="togglePDFFullscreen()" title="Full screen">⛶</button>
+        <button class="pdf-close-btn" onclick="closePDFPanel()" title="Close viewer">✕</button>
+      </div>
+    </div>
+    <!-- PDF Search bar -->
+    <div style="background:#121220;padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <input id="pdfSearchInput" type="text" placeholder="🔍 Search in PDF…"
+        style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:5px 10px;color:white;font-size:12px;outline:none;font-family:inherit"
+        oninput="onPdfSearch()" onkeydown="pdfSearchKey(event)">
+      <span id="pdfSearchCount" style="font-size:10.5px;color:#555;white-space:nowrap;min-width:52px;text-align:center"></span>
+      <button class="pdf-nav-btn" id="pdfSearchPrev" onclick="pdfSearchNav(-1)" disabled title="Previous match">▲</button>
+      <button class="pdf-nav-btn" id="pdfSearchNext" onclick="pdfSearchNav(1)" disabled title="Next match">▼</button>
+    </div>
+    <div class="pdf-canvas-wrap" id="pdfCanvasWrap">
+      <div class="pdf-loading" id="pdfLoading">
+        <div class="spinner"></div>
+        Open a PDF to preview it here
+      </div>
+      <div id="pdfCanvasContainer" style="position:relative;display:inline-block">
+        <canvas id="pdfCanvas" style="display:none"></canvas>
+      </div>
+      <div id="pageHighlight"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Compare PDFs Modal ── -->
+<div id="compareOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,10,30,0.6);backdrop-filter:blur(4px);z-index:2000;align-items:center;justify-content:center">
+  <div style="background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:480px;max-width:92vw;box-shadow:0 16px 48px rgba(0,0,0,0.4)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 style="color:white;font-size:16px;font-weight:600">⚖️ Compare Two PDFs</h2>
+      <button onclick="closeCompare()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:white;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:14px">✕</button>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px">First PDF</label>
+      <select id="comparePdf1" style="width:100%;background:#121220;border:1px solid rgba(255,255,255,0.1);color:white;padding:9px 12px;border-radius:8px;font-size:13px;outline:none">
+        <option value="">Select a PDF…</option>
+      </select>
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px">Second PDF</label>
+      <select id="comparePdf2" style="width:100%;background:#121220;border:1px solid rgba(255,255,255,0.1);color:white;padding:9px 12px;border-radius:8px;font-size:13px;outline:none">
+        <option value="">Select a PDF…</option>
+      </select>
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px">Topic to compare</label>
+      <input id="compareTopic" type="text" placeholder="e.g. key features, pricing, conclusion…"
+        style="width:100%;background:#121220;border:1px solid rgba(255,255,255,0.1);color:white;padding:9px 12px;border-radius:8px;font-size:13px;outline:none;font-family:inherit">
+    </div>
+    <button onclick="runComparison()" id="compareRunBtn"
+      style="width:100%;background:#6366f1;color:white;border:none;padding:11px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:500;transition:opacity 0.2s">
+       Compare Now
+    </button>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// ── PDF.js init ───────────────────────────────────────────────────────────────
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── PDF viewer state ──────────────────────────────────────────────────────────
+let pdfDoc = null;
+let currentPage = 1;
+let pdfRenderTask = null;
+let pdfFilename = null;
+let zoomLevel = 1.0;
+let pendingHighlightSnippet = null; // text to highlight after page renders
+
+function pdfZoom(delta) {
+  zoomLevel = Math.min(3.0, Math.max(0.5, zoomLevel + delta));
+  document.getElementById('zoomLabel').textContent = Math.round(zoomLevel * 100) + '%';
+  pdfGoTo(currentPage);
+}
+
+async function openPDFPanel(filename, page, snippet) {
+  page = page || 1;
+  pendingHighlightSnippet = snippet || null;
+  const panel = document.getElementById('pdfPanel');
+  panel.classList.add('open');
+
+  if (filename !== pdfFilename) {
+    pdfFilename = filename;
+    pdfDoc = null;
+    zoomLevel = 1.0;
+    document.getElementById('zoomLabel').textContent = '100%';
+    document.getElementById('pdfPanelTitle').textContent = filename;
+    document.getElementById('pdfCanvas').style.display = 'none';
+    const loading = document.getElementById('pdfLoading');
+    loading.style.display = 'block';
+    loading.innerHTML = '<div class="spinner"></div>Loading PDF…';
+    try {
+      const url = `/uploads/${encodeURIComponent(filename)}`;
+      pdfDoc = await pdfjsLib.getDocument(url).promise;
+      loading.style.display = 'none';
+      document.getElementById('pdfCanvas').style.display = 'block';
+    } catch(e) {
+      loading.innerHTML = `<div style="color:#f87171">Failed to load PDF.<br><small>${e.message}</small></div>`;
+      return;
+    }
+  }
+  await pdfGoTo(page);
+}
+
+async function pdfGoTo(page) {
+  if (!pdfDoc) return;
+  page = Math.max(1, Math.min(page, pdfDoc.numPages));
+  currentPage = page;
+  document.getElementById('pdfPageBadge').textContent = `p.${page} / ${pdfDoc.numPages}`;
+
+  if (pdfRenderTask) { pdfRenderTask.cancel(); }
+
+  const pdfPage = await pdfDoc.getPage(page);
+  const canvas = document.getElementById('pdfCanvas');
+  const wrap = document.getElementById('pdfCanvasWrap');
+
+  const dpr = window.devicePixelRatio || 1;
+  const wrapWidth = wrap.clientWidth - 24;
+  const viewport = pdfPage.getViewport({ scale: 1 });
+  const baseScale = wrapWidth / viewport.width;
+  const renderScale = baseScale * zoomLevel * dpr;
+  const scaledViewport = pdfPage.getViewport({ scale: renderScale });
+  const displayViewport = pdfPage.getViewport({ scale: baseScale * zoomLevel });
+
+  canvas.width = scaledViewport.width;
+  canvas.height = scaledViewport.height;
+  canvas.style.width = (scaledViewport.width / dpr) + 'px';
+  canvas.style.height = (scaledViewport.height / dpr) + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  pdfRenderTask = pdfPage.render({ canvasContext: ctx, viewport: scaledViewport });
+  try { await pdfRenderTask.promise; } catch(e) { /* cancelled */ }
+
+  // Render text layer for highlighting
+  await renderTextLayer(pdfPage, displayViewport);
+
+  // Highlight snippet if pending
+  if (pendingHighlightSnippet) {
+    highlightTextInLayer(pendingHighlightSnippet);
+    pendingHighlightSnippet = null;
+  }
+
+  // Re-apply active search highlights if a search query is active
+  if (pdfSearchQuery) {
+    highlightAllSearchMatches(pdfSearchQuery);
+  }
+
+  // Flash top bar
+  const hl = document.getElementById('pageHighlight');
+  hl.classList.add('flash');
+  setTimeout(() => hl.classList.remove('flash'), 600);
+
+  wrap.scrollTop = 0;
+}
+
+// ── Text layer rendering ──────────────────────────────────────────────────────
+async function renderTextLayer(pdfPage, viewport) {
+  const container = document.getElementById('pdfCanvasContainer');
+
+  // Remove old text layer
+  const old = document.getElementById('pdfTextLayer');
+  if (old) old.remove();
+
+  const canvas = document.getElementById('pdfCanvas');
+  const textLayerDiv = document.createElement('div');
+  textLayerDiv.id = 'pdfTextLayer';
+  textLayerDiv.className = 'pdf-text-layer';
+  textLayerDiv.style.width = canvas.style.width;
+  textLayerDiv.style.height = canvas.style.height;
+
+  // REQUIRED by PDF.js — without this, text spans render with wrong
+  // scale/position and can appear to "not work" even though they exist.
+  textLayerDiv.style.setProperty('--scale-factor', viewport.scale.toString());
+
+  container.appendChild(textLayerDiv);
+
+  try {
+    const textContent = await pdfPage.getTextContent();
+    await pdfjsLib.renderTextLayer({
+      textContentSource: textContent,
+      container: textLayerDiv,
+      viewport: viewport,
+      textDivs: [],
+    }).promise;
+    console.log('Text layer rendered:', textLayerDiv.querySelectorAll('span').length, 'spans');
+  } catch (err) {
+    console.error('renderTextLayer failed:', err);
+  }
+}
+
+// ── Text highlight ────────────────────────────────────────────────────────────
+function highlightTextInLayer(snippet) {
+  const textLayer = document.getElementById('pdfTextLayer');
+  if (!textLayer) return;
+
+  const cleanSnippet = snippet.replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!cleanSnippet) return;
+
+  // Clear previous highlights
+  textLayer.querySelectorAll('.pdf-highlight').forEach(el => {
+    el.classList.remove('pdf-highlight', 'pdf-highlight-fade');
+  });
+
+  // Build a list of meaningful words from the snippet (ignore tiny words)
+  const stopWords = new Set(['the','and','for','are','with','this','that','from','was','were','has','have']);
+  const snippetWords = cleanSnippet
+    .split(/[^a-z0-9]+/)
+    .filter(w => w.length > 2 && !stopWords.has(w));
+
+  if (snippetWords.length === 0) return;
+
+  const divs = textLayer.querySelectorAll('span');
+  let found = false;
+
+  // Highlight any span whose own text contains ANY of the snippet's words.
+  // PDF.js splits text into many small spans, so per-span word containment
+  // (not requiring multiple words per span) is what actually finds matches.
+  divs.forEach(div => {
+    const text = (div.textContent || '').toLowerCase();
+    if (text.trim().length < 2) return;
+    const spanWords = text.split(/[^a-z0-9]+/).filter(Boolean);
+    const isMatch = spanWords.some(sw => snippetWords.includes(sw));
+    if (isMatch) {
+      div.classList.add('pdf-highlight');
+      found = true;
+    }
+  });
+
+  if (found) {
+    // Scroll first match into view
+    const first = textLayer.querySelector('.pdf-highlight');
+    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Fade out after 4 seconds
+    setTimeout(() => {
+      textLayer.querySelectorAll('.pdf-highlight').forEach(el => {
+        el.classList.add('pdf-highlight-fade');
+        setTimeout(() => el.classList.remove('pdf-highlight', 'pdf-highlight-fade'), 800);
+      });
+    }, 4000);
+  } else {
+    console.warn('Highlight: no matching text found in text layer for snippet:', snippet.slice(0, 60));
+  }
+}
+
+function closePDFPanel() {
+  const panel = document.getElementById('pdfPanel');
+  panel.classList.remove('open', 'fullscreen');
+  document.getElementById('fullscreenBtn').textContent = '⛶';
+  document.getElementById('fullscreenBtn').title = 'Full screen';
+}
+
+// ── Feature 12: Full screen PDF viewer ───────────────────────────────────────
+function togglePDFFullscreen() {
+  const panel = document.getElementById('pdfPanel');
+  const btn = document.getElementById('fullscreenBtn');
+  const isFs = panel.classList.contains('fullscreen');
+  if (isFs) {
+    panel.classList.remove('fullscreen');
+    btn.textContent = '⛶';
+    btn.title = 'Full screen';
+  } else {
+    panel.classList.add('open', 'fullscreen');
+    btn.textContent = '⊠';
+    btn.title = 'Exit full screen';
+  }
+  // Re-render page at new size
+  setTimeout(() => pdfGoTo(currentPage), 350);
+}
+// Exit fullscreen with Escape key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const panel = document.getElementById('pdfPanel');
+    if (panel.classList.contains('fullscreen')) togglePDFFullscreen();
+    closeCompare();
+  }
+});
+
+// ── Feature 13: PDF search — highlight ALL matches on page ───────────────────
+let pdfSearchMatches = [];
+let pdfSearchIndex = -1;
+let pdfSearchQuery = '';
+let pdfSearchTimeout = null;
+
+function onPdfSearch() {
+  clearTimeout(pdfSearchTimeout);
+  pdfSearchTimeout = setTimeout(runPdfSearch, 400);
+}
+
+async function runPdfSearch() {
+  const query = document.getElementById('pdfSearchInput').value.trim().toLowerCase();
+  const countEl = document.getElementById('pdfSearchCount');
+  const prevBtn = document.getElementById('pdfSearchPrev');
+  const nextBtn = document.getElementById('pdfSearchNext');
+
+  pdfSearchQuery = query;
+
+  if (!pdfDoc || !query) {
+    pdfSearchMatches = []; pdfSearchIndex = -1;
+    countEl.textContent = '';
+    prevBtn.disabled = true; nextBtn.disabled = true;
+    clearSearchHighlights();
+    return;
+  }
+
+  // Find all pages containing the query
+  pdfSearchMatches = [];
+  for (let p = 1; p <= pdfDoc.numPages; p++) {
+    const page = await pdfDoc.getPage(p);
+    const tc = await page.getTextContent();
+    const pageText = tc.items.map(i => i.str).join(' ').toLowerCase();
+    if (pageText.includes(query)) pdfSearchMatches.push(p);
+  }
+
+  if (pdfSearchMatches.length === 0) {
+    countEl.textContent = 'No results';
+    countEl.style.color = '#f87171';
+    prevBtn.disabled = true; nextBtn.disabled = true;
+    pdfSearchIndex = -1;
+    clearSearchHighlights();
+  } else {
+    pdfSearchIndex = 0;
+    countEl.textContent = `1 / ${pdfSearchMatches.length}`;
+    countEl.style.color = '#6366f1';
+    prevBtn.disabled = false; nextBtn.disabled = false;
+    await pdfGoTo(pdfSearchMatches[0]);
+    highlightAllSearchMatches(query);
+  }
+}
+
+function pdfSearchNav(dir) {
+  if (!pdfSearchMatches.length) return;
+  pdfSearchIndex = (pdfSearchIndex + dir + pdfSearchMatches.length) % pdfSearchMatches.length;
+  document.getElementById('pdfSearchCount').textContent = `${pdfSearchIndex + 1} / ${pdfSearchMatches.length}`;
+  pdfGoTo(pdfSearchMatches[pdfSearchIndex]).then(() => {
+    if (pdfSearchQuery) highlightAllSearchMatches(pdfSearchQuery);
+  });
+}
+
+function pdfSearchKey(e) {
+  if (e.key === 'Enter') pdfSearchNav(e.shiftKey ? -1 : 1);
+}
+
+function clearSearchHighlights() {
+  const layer = document.getElementById('pdfTextLayer');
+  if (!layer) return;
+  layer.querySelectorAll('.pdf-search-highlight').forEach(el => el.classList.remove('pdf-search-highlight'));
+}
+
+// Highlight ALL occurrences of search query on current page
+function highlightAllSearchMatches(query) {
+  const layer = document.getElementById('pdfTextLayer');
+  if (!layer || !query) return;
+  clearSearchHighlights();
+  const q = query.toLowerCase();
+  layer.querySelectorAll('span').forEach(span => {
+    if ((span.textContent || '').toLowerCase().includes(q)) {
+      span.classList.add('pdf-search-highlight');
+    }
+  });
+  // Scroll to first match
+  const first = layer.querySelector('.pdf-search-highlight');
+  if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ── Feature 16: Document comparison ──────────────────────────────────────────
+function openCompare() {
+  if (uploadedPDFs.length < 2) {
+    addSystemMsg('Please upload at least 2 PDFs to use comparison.');
+    return;
+  }
+  // Populate dropdowns
+  const opts = uploadedPDFs.map((p, i) => `<option value="${p.name}">${p.name}</option>`).join('');
+  document.getElementById('comparePdf1').innerHTML = '<option value="">Select a PDF…</option>' + opts;
+  document.getElementById('comparePdf2').innerHTML = '<option value="">Select a PDF…</option>' + opts;
+  document.getElementById('compareTopic').value = '';
+  const overlay = document.getElementById('compareOverlay');
+  overlay.style.display = 'flex';
+}
+
+function closeCompare() {
+  document.getElementById('compareOverlay').style.display = 'none';
+}
+
+async function runComparison() {
+  const pdf1 = document.getElementById('comparePdf1').value;
+  const pdf2 = document.getElementById('comparePdf2').value;
+  const topic = document.getElementById('compareTopic').value.trim();
+
+  if (!pdf1 || !pdf2) { alert('Please select both PDFs.'); return; }
+  if (pdf1 === pdf2) { alert('Please select two different PDFs.'); return; }
+  if (!topic) { alert('Please enter a topic to compare.'); return; }
+  if (!wsReady) { alert('WebSocket not connected. Please wait.'); return; }
+
+  closeCompare();
+
+  const question =
+`Compare "${pdf1}" and "${pdf2}" on the topic: "${topic}".
+
+IMPORTANT: For this comparison, search_documents must be called TWICE — once scoped to "${pdf1}" and once scoped to "${pdf2}" — not just once. Use both results to fill the table below.
+
+Respond using ONLY a markdown table in this EXACT format (no extra prose before or after, no bullet points, no "Document 1:" headers, no page citations):
+
+| Aspect | ${pdf1} | ${pdf2} |
+| --- | --- | --- |
+| <specific point 1> | <what doc 1 says> | <what doc 2 says> |
+| <specific point 2> | <what doc 1 says> | <what doc 2 says> |
+| <specific point 3> | <what doc 1 says> | <what doc 2 says> |
+
+Rules:
+- Break the topic "${topic}" into 3-6 specific sub-points (rows) and compare both documents on each one.
+- If a document has no information for a row, write "Not mentioned" in that cell — do not skip the row.
+- Keep each cell short (1-2 sentences max). No page numbers inside cells.
+- Output ONLY the table. Do not add a summary paragraph before or after it.`;
+
+  addMessage(`⚖️ Comparing "${pdf1}" vs "${pdf2}" on: ${topic}`, 'user');
+  lastQuestion = question;
+
+  currentBotWrapper = null; currentBotBubble = null; currentCitationsDiv = null;
+  activeCitations = []; tokenQueue = []; pendingCitations = [];
+  socketDone = false; isTickerRunning = false;
+
+  addTypingIndicator();
+
+  // Send with filename: null so agent auto-searches both PDFs
+  ws.send(JSON.stringify({ question, filename: null }));
+}
+
+// ── Sidebar toggle ────────────────────────────────────────────────────────────
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const btn = document.getElementById('sidebarToggle');
+  sidebar.classList.toggle('collapsed');
+  btn.textContent = sidebar.classList.contains('collapsed') ? '☰' : '✕';
+  btn.title = sidebar.classList.contains('collapsed') ? 'Open sidebar' : 'Close sidebar';
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let pdfUploaded = false;
+let uploadedPDFs = [];
+let activePDFIndex = -1;
+let activeCitations = [];
+let lastQuestion = '';
+
+// ── Streaming Queue State ─────────────────────────────────────────────────────
+let tokenQueue = [];
+let pendingCitations = [];
+let isTickerRunning = false;
+let socketDone = false;
+
+// ── WebSocket Setup ───────────────────────────────────────────────────────────
+let ws = null;
+let wsReady = false;
+let currentBotWrapper = null;
+let currentBotBubble = null;
+let currentCitationsDiv = null;
+
+function connectWS() {
+  if (ws) { ws.onclose = null; ws.close(); }
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws/chat`);
+  ws.onopen = () => { wsReady = true; setWSStatus('connected'); document.getElementById('sendBtn').disabled = !pdfUploaded; };
+  ws.onclose = () => { wsReady = false; setWSStatus('connecting'); document.getElementById('sendBtn').disabled = true; setTimeout(connectWS, 2000); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = (evt) => { let msg; try { msg = JSON.parse(evt.data); } catch { return; } handleWsEvent(msg); };
+}
+
+function handleWsEvent(msg) {
+  const chat = document.getElementById('chat');
+  switch (msg.type) {
+    case 'citation': { pendingCitations = msg.data || []; break; }
+    case 'tool': { break; } // agent steps hidden
+    case 'token': { tokenQueue.push(msg.data); startTokenTicker(); break; }
+    case 'done': { socketDone = true; if (!isTickerRunning) finalizeMessage(); break; }
+    case 'error': {
+      tokenQueue = []; pendingCitations = []; socketDone = false; isTickerRunning = false;
+      removeTypingIndicator();
+      addMessage(msg.data || 'An error occurred.', 'bot error');
+      currentBotWrapper = null; currentBotBubble = null; currentCitationsDiv = null;
+      document.getElementById('sendBtn').disabled = false;
+      document.getElementById('question').disabled = false;
+      break;
+    }
+  }
+}
+
+// ── Citation click: open PDF + highlight relevant text ────────────────────────
+function openCitationInViewer(citation, refNum) {
+  openPDFPanel(citation.source, citation.page, citation.snippet);
+}
+
+function formatMarkdown(text) {
+  let html = escHtml(text);
+  html = html.replace(/```[a-zA-Z0-9]*\n([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+  html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+  const lines = html.split('\n');
+  let inList = false;
+  let inTable = false;
+  let tableRows = [];
+  const output = [];
+
+  const isTableRow = (line) => /^\s*\|.*\|\s*$/.test(line);
+  const isSeparatorRow = (line) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
+
+  const flushTable = () => {
+    if (tableRows.length === 0) return;
+    const parseCells = (row) => row.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+    const header = parseCells(tableRows[0]);
+    const bodyRows = tableRows.slice(2); // skip header + separator
+    let tableHtml = '<div class="table-wrap"><table class="md-table"><thead><tr>';
+    header.forEach(h => { tableHtml += `<th>${h}</th>`; });
+    tableHtml += '</tr></thead><tbody>';
+    bodyRows.forEach(r => {
+      const cells = parseCells(r);
+      tableHtml += '<tr>';
+      cells.forEach(c => { tableHtml += `<td>${c}</td>`; });
+      tableHtml += '</tr>';
+    });
+    tableHtml += '</tbody></table></div>';
+    output.push(tableHtml);
+    tableRows = [];
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const line = rawLine.trim();
+
+    // ── Table detection: a row, immediately followed by a separator row ──
+    if (isTableRow(line) && lines[i + 1] && isSeparatorRow(lines[i + 1].trim())) {
+      if (inList) { output.push('</ul>'); inList = false; }
+      inTable = true;
+      tableRows.push(line);
+      continue;
+    }
+    if (inTable && isTableRow(line)) {
+      tableRows.push(line);
+      continue;
+    }
+    if (inTable && !isTableRow(line)) {
+      flushTable();
+      inTable = false;
+      // fall through to process this line normally below
+    }
+
+    // ── Bullet list handling ──
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      const content = line.substring(2);
+      if (!inList) { output.push('<ul><li>' + content + '</li>'); inList = true; }
+      else { output.push('<li>' + content + '</li>'); }
+    } else {
+      if (inList) { output.push('</ul>'); inList = false; }
+      output.push(rawLine);
+    }
+  }
+  if (inTable) flushTable();
+  if (inList) output.push('</ul>');
+
+  return output.join('\n');
+}
+
+function startTokenTicker() {
+  if (isTickerRunning) return;
+  isTickerRunning = true;
+  function tick() {
+    if (tokenQueue.length > 0) {
+      let n = tokenQueue.length > 30 ? 3 : tokenQueue.length > 15 ? 2 : 1;
+      let chunk = '';
+      for (let i = 0; i < n && tokenQueue.length > 0; i++) chunk += tokenQueue.shift();
+      removeTypingIndicator();
+      if (!currentBotBubble) ensureBotBubble();
+      currentBotBubble.textContent += chunk;
+      document.getElementById('chat').scrollTop = 9999;
+      setTimeout(tick, tokenQueue.length > 10 ? 10 : 25);
+    } else if (socketDone) {
+      isTickerRunning = false;
+      finalizeMessage();
+    } else { setTimeout(tick, 50); }
+  }
+  tick();
+}
+
+const VAGUE_PATTERNS = [
+  /^(tell|show|give|describe|explain|what|who|how|when|where|why|list|summarize|summary|about|info|information|details?)$/i,
+  /^.{1,6}$/
+];
+function isVagueQuery(q) { return VAGUE_PATTERNS.some(p => p.test(q.trim())); }
+
+function buildSuggestions(query) {
+  const q = query.trim().toLowerCase();
+  const base = [
+    { icon: '📋', text: 'Summarize the entire PDF' },
+    { icon: '🔍', text: 'Tell me the main topics covered' },
+    { icon: '📌', text: 'List the key points from the document' },
+    { icon: '❓', text: 'What is this document about?' },
+  ];
+  if (q.length > 1) {
+    base.unshift({ icon: '💬', text: `${query.trim()} me about this PDF` });
+    base.unshift({ icon: '💬', text: `${query.trim()} me the summary of the PDF` });
+  }
+  return base.slice(0, 4);
+}
+
+function showSuggestions(query) {
+  hideEmptyState();
+  const chat = document.getElementById('chat');
+  const wrapper = document.createElement('div');
+  wrapper.className = 'msg-wrapper bot-wrapper';
+  const card = document.createElement('div');
+  card.className = 'suggestion-card';
+  const header = document.createElement('div');
+  header.className = 'sugg-header';
+  header.innerHTML = '<span>💡</span> Did you mean one of these?';
+  card.appendChild(header);
+  const pills = document.createElement('div');
+  pills.className = 'suggestion-pills';
+  buildSuggestions(query).forEach(s => {
+    const pill = document.createElement('button');
+    pill.className = 'sugg-pill';
+    pill.innerHTML = `<span class="sugg-icon">${s.icon}</span>${escHtml(s.text)}`;
+    pill.addEventListener('click', () => { document.getElementById('question').value = s.text; wrapper.remove(); sendQuestion(); });
+    pills.appendChild(pill);
+  });
+  card.appendChild(pills);
+  wrapper.appendChild(card);
+  chat.appendChild(wrapper);
+  chat.scrollTop = 9999;
+  document.getElementById('sendBtn').disabled = false;
+  document.getElementById('question').disabled = false;
+  document.getElementById('question').focus();
+}
+
+function finalizeMessage() {
+  const rawText = currentBotBubble ? currentBotBubble.textContent.trim() : '';
+  const notFoundPhrases = ['information not found','not found in the pdf','not mentioned in the','no information','cannot find',"don't have information",'not available in','does not contain'];
+  const isNotFound = notFoundPhrases.some(p => rawText.toLowerCase().includes(p));
+
+  if (isNotFound && lastQuestion && isVagueQuery(lastQuestion)) {
+    if (currentBotWrapper) currentBotWrapper.remove();
+    currentBotWrapper = null; currentBotBubble = null; currentCitationsDiv = null;
+    tokenQueue = []; pendingCitations = []; socketDone = false;
+    showSuggestions(lastQuestion);
+    return;
+  }
+  if (isNotFound) pendingCitations = [];
+  if (currentBotBubble) formatFinalMessage(currentBotBubble);
+
+  if (currentCitationsDiv && pendingCitations.length > 0) {
+    activeCitations = pendingCitations;
+    const seenPages = new Set();
+    let refNum = 0;
+    pendingCitations.forEach((c) => {
+      const pageKey = `${c.source}::${c.page}`;
+      if (seenPages.has(pageKey)) return;
+      seenPages.add(pageKey);
+      refNum++;
+      const badge = document.createElement('div');
+      badge.className = 'citation-badge';
+      const shortName = c.source.length > 22 ? c.source.substring(0, 20) + '…' : c.source;
+      badge.innerHTML = `<span class="cit-num">${refNum}</span><span class="cit-label" title="${c.source}">${shortName}</span><span class="cit-page">p.${c.page}</span>`;
+      badge.addEventListener('click', () => openCitationInViewer(c, refNum));
+      currentCitationsDiv.appendChild(badge);
+    });
+  }
+
+  document.getElementById('chat').scrollTop = 9999;
+  currentBotWrapper = null; currentBotBubble = null; currentCitationsDiv = null;
+  tokenQueue = []; pendingCitations = []; socketDone = false;
+  document.getElementById('sendBtn').disabled = false;
+  document.getElementById('question').disabled = false;
+  document.getElementById('question').focus();
+}
+
+function formatFinalMessage(bubble) {
+  let text = bubble.textContent;
+  let formatted = formatMarkdown(text);
+  const regex = /[\(\[]Page[s]?\s*(\d+)[\)\]]/gi;
+  formatted = formatted.replace(regex, (match, pageNum) => `<span class="inline-citation" data-page="${pageNum}">📄 p.${pageNum}</span>`);
+  bubble.innerHTML = formatted;
+  bubble.querySelectorAll('.inline-citation').forEach(span => {
+    const pageNum = parseInt(span.getAttribute('data-page'));
+    const citation = activeCitations.find(c => c.page === pageNum);
+    const fallback = { source: uploadedPDFs[activePDFIndex] ? uploadedPDFs[activePDFIndex].name : 'Document', page: pageNum, snippet: '' };
+    span.addEventListener('click', () => openCitationInViewer(citation || fallback, citation ? activeCitations.indexOf(citation) + 1 : '?'));
+  });
+}
+
+function ensureBotBubble() {
+  if (currentBotBubble) return;
+  hideEmptyState();
+  const chat = document.getElementById('chat');
+  currentBotWrapper = document.createElement('div');
+  currentBotWrapper.className = 'msg-wrapper bot-wrapper';
+  currentBotBubble = document.createElement('div');
+  currentBotBubble.className = 'message bot';
+  currentCitationsDiv = document.createElement('div');
+  currentCitationsDiv.className = 'citations';
+  currentBotWrapper.appendChild(currentBotBubble);
+  currentBotWrapper.appendChild(currentCitationsDiv);
+  chat.appendChild(currentBotWrapper);
+  chat.scrollTop = 9999;
+}
+
+function setWSStatus(state) {
+  const el = document.getElementById('wsIndicator');
+  el.className = state;
+  el.textContent = state === 'connected' ? '⬤ live' : '⬤ connecting';
+}
+function setStatus(text, ok) { const el = document.getElementById('status'); el.textContent = text; el.className = ok ? 'uploaded' : ''; }
+function setAutoStatus() {
+  const el = document.getElementById('status');
+  if (uploadedPDFs.length === 0) { el.textContent = 'No PDF uploaded'; el.className = ''; }
+  else { el.textContent = `🔎 Auto-search · ${uploadedPDFs.length} PDF${uploadedPDFs.length > 1 ? 's' : ''}`; el.className = 'uploaded auto'; }
+}
+function hideEmptyState() { const e = document.getElementById('emptyState'); if (e) e.remove(); }
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function addMessage(text, cls) {
+  hideEmptyState();
+  const chat = document.getElementById('chat');
+  const wrapper = document.createElement('div');
+  wrapper.className = 'msg-wrapper ' + (cls === 'user' ? 'user-wrapper' : 'bot-wrapper');
+  const bubble = document.createElement('div');
+  bubble.className = 'message ' + cls;
+  bubble.textContent = text;
+  wrapper.appendChild(bubble);
+  chat.appendChild(wrapper);
+  chat.scrollTop = 9999;
+}
+function addSystemMsg(text) {
+  hideEmptyState();
+  const chat = document.getElementById('chat');
+  const d = document.createElement('div');
+  d.className = 'system-msg'; d.textContent = text;
+  chat.appendChild(d);
+  chat.scrollTop = 9999;
+}
+function addTypingIndicator() {
+  hideEmptyState();
+  const chat = document.getElementById('chat');
+  currentBotWrapper = document.createElement('div');
+  currentBotWrapper.className = 'msg-wrapper bot-wrapper';
+  const d = document.createElement('div');
+  d.className = 'message bot typing'; d.id = 'typing';
+  d.innerHTML = '<span></span><span></span><span></span>';
+  currentCitationsDiv = document.createElement('div');
+  currentCitationsDiv.className = 'citations';
+  currentBotWrapper.appendChild(d);
+  currentBotWrapper.appendChild(currentCitationsDiv);
+  chat.appendChild(currentBotWrapper);
+  chat.scrollTop = 9999;
+}
+function removeTypingIndicator() {
+  const t = document.getElementById('typing');
+  if (t) t.remove();
+  if (currentBotWrapper && !currentBotBubble) {
+    currentBotBubble = document.createElement('div');
+    currentBotBubble.className = 'message bot';
+    currentBotWrapper.insertBefore(currentBotBubble, currentCitationsDiv);
+  }
+}
+
+function sendQuestion() {
+  const input = document.getElementById('question');
+  const question = input.value.trim();
+  if (!question) return;
+  if (!pdfUploaded) { addMessage('Please upload a PDF before asking a question.', 'bot error'); return; }
+  if (!wsReady) { addMessage('WebSocket not connected. Please wait...', 'bot error'); return; }
+  addMessage(question, 'user');
+  lastQuestion = question;
+  input.value = '';
+  document.getElementById('sendBtn').disabled = true;
+  input.disabled = true;
+  currentBotWrapper = null; currentBotBubble = null; currentCitationsDiv = null;
+  activeCitations = []; tokenQueue = []; pendingCitations = [];
+  socketDone = false; isTickerRunning = false;
+  addTypingIndicator();
+  ws.send(JSON.stringify({ question, filename: activePDFIndex !== -1 ? uploadedPDFs[activePDFIndex].name : null }));
+}
+
+document.getElementById('pdfFile').addEventListener('change', function() {
+  document.getElementById('sideFileLabel').textContent = this.files[0] ? this.files[0].name : '📎 Choose PDF';
+});
+document.getElementById('question').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter' && !document.getElementById('sendBtn').disabled) sendQuestion();
+});
+
+async function uploadPDF() {
+  const fileInput = document.getElementById('pdfFile');
+  const file = fileInput.files[0];
+  if (!file) { addMessage('Please choose a PDF file first.', 'bot error'); return; }
+  const btn = document.getElementById('uploadBtn');
+  btn.disabled = true; btn.textContent = 'Uploading...';
+  setStatus('Uploading ' + file.name + '...', false);
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/upload', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (res.ok) {
+      pdfUploaded = true;
+      uploadedPDFs.push({ name: file.name, size: file.size, chunks: data.chunks || '?' });
+      renderPDFList(); setAutoStatus();
+      addSystemMsg(data.message || 'PDF processed and ready. Auto-search is active across all PDFs.');
+      fileInput.value = '';
+      document.getElementById('sideFileLabel').textContent = '📎 Choose PDF';
+      if (wsReady) document.getElementById('sendBtn').disabled = false;
+      await openPDFPanel(file.name, 1);
+    } else {
+      setStatus('No PDF uploaded', false);
+      addMessage('Upload failed: ' + (data.error || 'Unknown error'), 'bot error');
+    }
+  } catch (err) {
+    setStatus('No PDF uploaded', false);
+    addMessage('Cannot connect to backend.', 'bot error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Upload PDF';
+  }
+}
+
+function togglePdfSwitcher(e) {
+  e.stopPropagation();
+  const popup = document.getElementById('pdfSwitcherPopup');
+  if (popup.classList.contains('open')) { popup.classList.remove('open'); }
+  else { renderSwitcherList(); popup.classList.add('open'); }
+}
+
+function renderSwitcherList() {
+  const list = document.getElementById('switcherList');
+  if (uploadedPDFs.length === 0) { list.innerHTML = `<div style="padding:12px 10px;font-size:12px;color:#555">No PDFs uploaded yet</div>`; return; }
+  const autoEntry = `<div class="switcher-entry${activePDFIndex === -1 ? ' active' : ''}" onclick="setAutoSearch()"><span class="sw-icon">🔎</span><div class="sw-info"><div class="sw-name">Auto-search all PDFs</div><div class="sw-meta">Searches every uploaded document</div></div>${activePDFIndex === -1 ? '<span style="font-size:11px;color:#6366f1;flex-shrink:0">active</span>' : ''}</div>`;
+  const pdfEntries = uploadedPDFs.map((pdf, i) => `<div class="switcher-entry${i === activePDFIndex ? ' active' : ''}" onclick="switchPDFFromPopup(${i})"><span class="sw-icon">📄</span><div class="sw-info"><div class="sw-name">${pdf.name}</div><div class="sw-meta">${(pdf.size/1024).toFixed(1)} KB · ${pdf.chunks} chunks</div></div>${i === activePDFIndex ? '<span style="font-size:11px;color:#6366f1;flex-shrink:0">active</span>' : ''}</div>`).join('');
+  list.innerHTML = autoEntry + pdfEntries;
+}
+
+function setAutoSearch() {
+  activePDFIndex = -1;
+  document.getElementById('pdfSwitcherPopup').classList.remove('open');
+  setAutoStatus(); renderPDFList();
+  addSystemMsg('Switched to Auto-search — questions will search across all uploaded PDFs.');
+}
+function switchPDFFromPopup(i) { document.getElementById('pdfSwitcherPopup').classList.remove('open'); switchPDF(i); }
+
+async function deletePDF(e, i) {
+  e.stopPropagation();
+  const pdf = uploadedPDFs[i];
+  if (!confirm(`Delete "${pdf.name}"? This cannot be undone.`)) return;
+  try {
+    const res = await fetch(`/documents/${encodeURIComponent(pdf.name)}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (res.ok) {
+      addSystemMsg(`'${pdf.name}' deleted.`);
+      uploadedPDFs.splice(i, 1);
+      activePDFIndex = -1;
+      if (uploadedPDFs.length === 0) { pdfUploaded = false; document.getElementById('sendBtn').disabled = true; setStatus('No PDF uploaded', false); closePDFPanel(); }
+      else { setAutoStatus(); }
+      renderPDFList();
+    } else { addMessage('Delete failed: ' + (data.error || 'Unknown error'), 'bot error'); }
+  } catch(err) { addMessage('Cannot connect to backend.', 'bot error'); }
+}
+
+document.addEventListener('click', () => { document.getElementById('pdfSwitcherPopup')?.classList.remove('open'); });
+
+function renderPDFList() {
+  const list = document.getElementById('pdfList');
+  if (uploadedPDFs.length === 0) { list.innerHTML = "<div style='padding:10px 14px;font-size:12px;color:#444'>No PDFs yet</div>"; return; }
+  const autoEntry = `<div class="pdf-entry${activePDFIndex === -1 ? " active" : ""}" onclick="setAutoSearch()"><span class="pdf-icon-sm">🔎</span><div class="pdf-info"><div class="pdf-title">Auto-search all PDFs</div><div class="pdf-meta">Default · searches everything</div></div></div>`;
+  const pdfEntries = uploadedPDFs.map((pdf, i) => `<div class="pdf-entry${i===activePDFIndex?" active":""}" onclick="switchPDF(${i})"><span class="pdf-icon-sm">📄</span><div class="pdf-info"><div class="pdf-title">${pdf.name}</div><div class="pdf-meta">${(pdf.size/1024).toFixed(1)} KB · ${pdf.chunks} chunks</div></div><button class="pdf-delete-btn" onclick="deletePDF(event,${i})" title="Delete PDF">✕</button></div>`).join('');
+  list.innerHTML = autoEntry + pdfEntries;
+}
+
+function switchPDF(i) {
+  activePDFIndex = i; renderPDFList();
+  setStatus(uploadedPDFs[i].name, true);
+  addSystemMsg('Switched context to: ' + uploadedPDFs[i].name);
+  openPDFPanel(uploadedPDFs[i].name, 1);
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar.classList.contains('collapsed')) {
+    sidebar.classList.remove('collapsed');
+    document.getElementById('sidebarToggle').textContent = '✕';
+  }
+}
+
+function newChat() {
+  document.getElementById('chat').innerHTML = "<div class='empty-state' id='emptyState'><h2>Ask your documents anything</h2><p>Upload a PDF from the sidebar to get started.</p></div>";
+}
+
+async function loadExistingPDFs() {
+  try {
+    const res = await fetch('/documents');
+    if (res.ok) {
+      const data = await res.json();
+      const docs = data.documents || [];
+      if (docs.length > 0) {
+        pdfUploaded = true;
+        uploadedPDFs = docs.map(d => ({ name: d.name, size: d.size, chunks: d.chunks || '?' }));
+        activePDFIndex = -1;
+        setAutoStatus(); renderPDFList();
+        if (wsReady) document.getElementById('sendBtn').disabled = false;
+        await openPDFPanel(uploadedPDFs[0].name, 1);
+      }
+    }
+  } catch (err) { console.error('Failed to load existing PDFs:', err); }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderPDFList();
+connectWS();
+loadExistingPDFs();
+</script>
+</body>
+</html>
